@@ -1,38 +1,85 @@
+import collections
 import functools
 import io
+import os
 # Python3, if using Python2 install pathlib from pypi.
 import pathlib
 
 import cogapp
 
+visit_methods = collections.OrderedDict([
+    ('file', ['Schema', 'schema::CodeGeneratorRequest::RequestedFile::Reader']),
+    ('imports', ['Schema', 'List<Import>::Reader']),
+    ('import', ['Schema', 'Import::Reader']),
+    ('nested_decls', ['Schema']),
+    ('decl', ['Schema', 'schema::Node::NestedNode::Reader']),
+    ('struct_decl', ['Schema', 'schema::Node::NestedNode::Reader']),
+    ('enum_decl', ['Schema', 'schema::Node::NestedNode::Reader']),
+    ('const_decl', ['Schema', 'schema::Node::NestedNode::Reader']),
+    ('annotation_decl', ['Schema', 'schema::Node::NestedNode::Reader']),
+    ('annotation', ['schema::Annotation::Reader', 'Schema']),
+    ('annotations', ['Schema']),
+    ('type', ['Schema', 'schema::Type::Reader']),
+    ('value', ['Schema', 'schema::Type::Reader', 'schema::Value::Reader']),
+    ('struct_fields', ['StructSchema']),
+    ('struct_default_value', ['StructSchema', 'capnp::StructSchema::Field']),
+    ('struct_field', ['StructSchema', 'StructSchema::Field']),
+    ('struct_field_slot', ['StructSchema', 'StructSchema::Field',
+                           'schema::Field::Slot::Reader']),
+    ('struct_field_group', ['StructSchema', 'StructSchema::Field',
+                            'schema::Field::Group::Reader', 'Schema']),
+    ('interface_decl', ['Schema', 'schema::Node::NestedNode::Reader']),
+    ('param_list', ['InterfaceSchema', 'kj::String&', 'StructSchema']),
+    ('method', ['InterfaceSchema', 'InterfaceSchema::Method']),
+    ('methods', ['InterfaceSchema']),
+    ('method_implicit_params', [
+        'InterfaceSchema', 'InterfaceSchema::Method',
+        'capnp::List<capnp::schema::Node::Parameter>::Reader']),
+    ('enumerant', ['Schema', 'EnumSchema::Enumerant']),
+    ('enumerants', ['Schema', 'EnumSchema::EnumerantList']),
+])
 
-def task_json_cog():
+python_keywords = [
+    'and', 'as', 'assert', 'break', 'class', 'continue', 'def', 'del', 'elif',
+    'else', 'except', 'exec', 'finally', 'for', 'from', 'global', 'if',
+    'import', 'in', 'is', 'lambda', 'not', 'or', 'pass', 'print', 'raise',
+    'return', 'try', 'while', 'with', 'yield'
+]
+
+
+class Cog(object):
     cog = cogapp.Cog()
     cog.options.bEofCanBeEnd = True
-    globals = {'smaller': True}
-
-    @listify
-    def make_processors(filenames):
-        def cog_process(filename):
-            with open(filename, 'r') as input:
-                oldVal = input.read()
-            fIn = io.StringIO(oldVal)
-            fOut = io.StringIO()
-            cog.processFile(fIn, fOut, fname=filename, globals=globals)
-            val = fOut.getvalue()
-            if val != oldVal:  # Save some headache with unchanged outputs
-                with open(filename, 'w') as output:
-                    output.write(val)
-        for filename in filenames:
-            yield lambda: cog_process(filename)
-
-    return {
-        'actions': make_processors(['json.c++', 'generic.h']),
-        'file_dep': ['json.c++', 'generic.h'],
+    globals = {
+        'smaller_annotations': True,
+        'visit_methods': visit_methods,
+        'python_keywords': python_keywords,
     }
+    filenames = ['json.c++', 'generic.h']
+
+    @classmethod
+    def create_doit_tasks(cls):
+        for filename in cls.filenames:
+            yield {
+                'actions': [(cls.cog_process, (filename,))],
+                'file_dep': [filename],
+                'basename': 'cog_%s' % filename,
+            }
+
+    @classmethod
+    def cog_process(cls, filename):
+        with open(filename, 'r') as input:
+            oldVal = input.read()
+        fIn = io.StringIO(oldVal)
+        fOut = io.StringIO()
+        cls.cog.processFile(fIn, fOut, fname=filename, globals=cls.globals)
+        val = fOut.getvalue()
+        if val != oldVal:  # Save some headache with unchanged outputs
+            with open(filename, 'w') as output:
+                output.write(val)
 
 
-def task_json():
+def compile(cc_file):
     @listify
     def recurse_dir(dir):
         return (str(p) for p in pathlib.Path(dir).glob('**') if p.is_file())
@@ -52,13 +99,21 @@ def task_json():
                           'DeathHandler/death_handler.cc -ldl')
     file_deps.extend(recurse_dir('DeathHandler'))
 
-    compile_json = ('clang++ json.c++ {} {} {} {} -o %(targets)s'
-                    ).format(clang_flags, rapidjson_flags,
+    compile_json = ('clang++ {} {} {} {} {} -o %(targets)s'
+                    ).format(cc_file, clang_flags, rapidjson_flags,
                              deathhandler_flags, capnp_flags)
-    file_deps.append('json.c++')
+    file_deps.append(cc_file)
     file_deps.append('generic.h')
-    return {'actions': [compile_json], 'targets': ['json'],
-            'file_dep': file_deps, 'task_dep': ['json_cog']}
+    base_name = os.path.splitext(cc_file)[0]
+    return {'actions': [compile_json],
+            'targets': [base_name], 'file_dep': file_deps,
+            'task_dep': ['cog_%s' % cc_file, 'cog_generic.h'],
+            'basename': 'compile_%s' % cc_file}
+
+
+def task_compile_cc():
+    for filename in ['json.c++']:
+        yield compile(filename)
 
 
 # From:

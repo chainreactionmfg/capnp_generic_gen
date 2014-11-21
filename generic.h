@@ -35,23 +35,21 @@ FinallyImpl<F> Finally(F f) {
 
 class BaseGenerator {
   public:
-   BaseGenerator(SchemaLoader& schemaLoader, FILE* fd)
-       : schemaLoader(schemaLoader), output(fd) {}
+   BaseGenerator(SchemaLoader& schemaLoader)
+       : schemaLoader(schemaLoader) {}
   SchemaLoader &schemaLoader;
-  FILE *output;
 
   const static auto TRAVERSAL_LIMIT = 1 << 30;  // Don't limit.
   constexpr static const char *TITLE = "Generator title";
   constexpr static const char *DESCRIPTION = "Generator description";
 
   virtual bool traverse_file(Schema file, schema::CodeGeneratorRequest::RequestedFile::Reader requestedFile) {
-    PRE_VISIT(file, file);
-    TRAVERSE(nested_decls, file);
-    TRAVERSE(imports, file, requestedFile.getImports());
-
+    PRE_VISIT(file, file, requestedFile);
     auto proto = file.getProto();
     TRAVERSE(annotations, file, proto.getAnnotations());
-    POST_VISIT(file, file);
+    TRAVERSE(nested_decls, file);
+    TRAVERSE(imports, file, requestedFile.getImports());
+    POST_VISIT(file, file, requestedFile);
     return false;
   }
 
@@ -215,63 +213,70 @@ class BaseGenerator {
   virtual bool traverse_struct_fields(StructSchema schema) {
     PRE_VISIT(struct_fields, schema);
     for (auto field : schema.getFields()) {
-      auto proto = field.getProto();
-      PRE_VISIT(struct_field, schema, field);
-      switch (proto.which()) {
-        case schema::Field::SLOT: {
-          auto slot = proto.getSlot();
-          PRE_VISIT(struct_field_slot, schema, field, slot);
-          TRAVERSE(type, schema, slot.getType());
-          if (slot.getHadExplicitDefault()) {
-            PRE_VISIT(struct_default_value, schema, field);
-            TRAVERSE(value, schema, slot.getType(), slot.getDefaultValue());
-            POST_VISIT(struct_default_value, schema, field);
-          }
-          POST_VISIT(struct_field_slot, schema, field, slot);
-          break;
-        }
-        case schema::Field::GROUP: {
-          auto group = proto.getGroup();
-          auto groupSchema = schemaLoader.get(group.getTypeId());
-          PRE_VISIT(struct_field_group, schema, field, group, groupSchema);
-          TRAVERSE(struct_fields, groupSchema.asStruct());
-          POST_VISIT(struct_field_group, schema, field, group, groupSchema);
-          break;
-        }
-      }
-      POST_VISIT(struct_field, schema, field);
+      TRAVERSE(struct_field, schema, field);
     }
     POST_VISIT(struct_fields, schema);
     return false;
   }
 
+  virtual bool traverse_struct_field(StructSchema schema, StructSchema::Field field) {
+    auto proto = field.getProto();
+    PRE_VISIT(struct_field, schema, field);
+    TRAVERSE(annotations, schema, proto.getAnnotations());
+    switch (proto.which()) {
+      case schema::Field::SLOT: {
+        auto slot = proto.getSlot();
+        PRE_VISIT(struct_field_slot, schema, field, slot);
+        TRAVERSE(type, schema, slot.getType());
+        if (slot.getHadExplicitDefault()) {
+          printf("-/-/\n");
+          PRE_VISIT(struct_default_value, schema, field);
+          TRAVERSE(value, schema, slot.getType(), slot.getDefaultValue());
+          POST_VISIT(struct_default_value, schema, field);
+        }
+        POST_VISIT(struct_field_slot, schema, field, slot);
+        break;
+      }
+      case schema::Field::GROUP: {
+        auto group = proto.getGroup();
+        auto groupSchema = schemaLoader.get(group.getTypeId());
+        PRE_VISIT(struct_field_group, schema, field, group, groupSchema);
+        TRAVERSE(struct_fields, groupSchema.asStruct());
+        POST_VISIT(struct_field_group, schema, field, group, groupSchema);
+        break;
+      }
+    }
+    POST_VISIT(struct_field, schema, field);
+    return false;
+  }
+
   virtual bool traverse_interface_decl(Schema schema, schema::Node::NestedNode::Reader decl) {
+    auto interface = schema.asInterface();
     PRE_VISIT(interface_decl, schema, decl);
     TRAVERSE(annotations, schema);
-    auto interface = schema.asInterface();
     PRE_VISIT(methods, interface);
     for (auto method : interface.getMethods()) {
-      PRE_VISIT(method, interface, method);
-      auto methodProto = method.getProto();
-      TRAVERSE(annotations, schema, methodProto.getAnnotations());
-      auto params = schemaLoader.get(
-          methodProto.getParamStructType(),
-          methodProto.getParamBrand(), schema).asStruct();
-      auto results = schemaLoader.get(
-          methodProto.getResultStructType(),
-          methodProto.getResultBrand(), schema).asStruct();
-      TRAVERSE(param_list, interface, kj::str("parameters"), params);
-      TRAVERSE(param_list, interface, kj::str("results"), results);
-      if (methodProto.hasImplicitParameters()) {
-        auto implicit = methodProto.getImplicitParameters();
-        PRE_VISIT(method_implicit_params, interface, method, implicit);
-        POST_VISIT(method_implicit_params, interface, method, implicit);
-      }
-      POST_VISIT(method, interface, method);
+      TRAVERSE(method, interface, method);
     }
     POST_VISIT(methods, interface);
     TRAVERSE(nested_decls, schema);
     POST_VISIT(interface_decl, schema, decl);
+    return false;
+  }
+
+  virtual bool traverse_method(Schema schema, InterfaceSchema::Method method) {
+    auto interface = schema.asInterface();
+    PRE_VISIT(method, interface, method);
+    auto methodProto = method.getProto();
+    TRAVERSE(annotations, schema, methodProto.getAnnotations());
+    TRAVERSE(param_list, interface, kj::str("parameters"), method.getParamType());
+    TRAVERSE(param_list, interface, kj::str("results"), method.getResultType());
+    if (methodProto.hasImplicitParameters()) {
+      auto implicit = methodProto.getImplicitParameters();
+      PRE_VISIT(method_implicit_params, interface, method, implicit);
+      POST_VISIT(method_implicit_params, interface, method, implicit);
+    }
+    POST_VISIT(method, interface, method);
     return false;
   }
 
@@ -294,98 +299,64 @@ class BaseGenerator {
     return false;
   }
 
-  #define VIRTUAL_BOOL_METHOD(func_name, ...) virtual bool func_name(__VA_ARGS__) { \
-    return false; \
-  }
-
   /*[[[cog
   def output_method(method, args):
     cog.outl('virtual bool %s(%s) { return false; }' % (method, ', '.join(args)))
-  methods = {
-    'file': ['Schema'],
-    'imports': ['Schema', 'List<Import>::Reader'],
-    'import': ['Schema', 'Import::Reader'],
-    'nested_decls': ['Schema'],
-    'decl': ['Schema', 'schema::Node::NestedNode::Reader'],
-    'struct_decl': ['Schema', 'schema::Node::NestedNode::Reader'],
-    'enum_decl': ['Schema', 'schema::Node::NestedNode::Reader'],
-    'const_decl': ['Schema', 'schema::Node::NestedNode::Reader'],
-    'annotation_decl': ['Schema', 'schema::Node::NestedNode::Reader'],
-    'annotation': ['schema::Annotation::Reader', 'Schema'],
-    'annotations': ['Schema'],
-    'type': ['Schema', 'schema::Type::Reader'],
-    'value': ['Schema', 'schema::Type::Reader', 'schema::Value::Reader'],
-    'struct_fields': ['StructSchema'],
-    'struct_default_value': ['StructSchema', 'capnp::StructSchema::Field'],
-    'struct_field': ['StructSchema', 'StructSchema::Field'],
-    'struct_field_slot': ['StructSchema', 'StructSchema::Field',
-                          'schema::Field::Slot::Reader'],
-    'struct_field_group': ['StructSchema', 'StructSchema::Field',
-                           'schema::Field::Group::Reader', 'Schema'],
-    'interface_decl': ['Schema', 'schema::Node::NestedNode::Reader'],
-    'param_list': ['InterfaceSchema', 'kj::String&', 'StructSchema'],
-    'method': ['InterfaceSchema', 'InterfaceSchema::Method'],
-    'methods': ['InterfaceSchema'],
-    'method_implicit_params': [
-        'InterfaceSchema', 'InterfaceSchema::Method',
-        'capnp::List<capnp::schema::Node::Parameter>::Reader'],
-    'enumerant': ['Schema', 'EnumSchema::Enumerant'],
-    'enumerants': ['Schema', 'EnumSchema::EnumerantList'],
-  }
-  for method, args in sorted(methods.items()):
+  for method, args in visit_methods.items():
     output_method('pre_visit_%s' % method, args)
+  for method, args in visit_methods.items():
     output_method('post_visit_%s' % method, args)
   ]]]*/
-  virtual bool pre_visit_annotation(schema::Annotation::Reader, Schema) { return false; }
-  virtual bool post_visit_annotation(schema::Annotation::Reader, Schema) { return false; }
-  virtual bool pre_visit_annotation_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool post_visit_annotation_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool pre_visit_annotations(Schema) { return false; }
-  virtual bool post_visit_annotations(Schema) { return false; }
-  virtual bool pre_visit_const_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool post_visit_const_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool pre_visit_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool post_visit_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool pre_visit_enum_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool post_visit_enum_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool pre_visit_enumerant(Schema, EnumSchema::Enumerant) { return false; }
-  virtual bool post_visit_enumerant(Schema, EnumSchema::Enumerant) { return false; }
-  virtual bool pre_visit_enumerants(Schema, EnumSchema::EnumerantList) { return false; }
-  virtual bool post_visit_enumerants(Schema, EnumSchema::EnumerantList) { return false; }
-  virtual bool pre_visit_file(Schema) { return false; }
-  virtual bool post_visit_file(Schema) { return false; }
-  virtual bool pre_visit_import(Schema, Import::Reader) { return false; }
-  virtual bool post_visit_import(Schema, Import::Reader) { return false; }
+  virtual bool pre_visit_file(Schema, schema::CodeGeneratorRequest::RequestedFile::Reader) { return false; }
   virtual bool pre_visit_imports(Schema, List<Import>::Reader) { return false; }
-  virtual bool post_visit_imports(Schema, List<Import>::Reader) { return false; }
-  virtual bool pre_visit_interface_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool post_visit_interface_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool pre_visit_method(InterfaceSchema, InterfaceSchema::Method) { return false; }
-  virtual bool post_visit_method(InterfaceSchema, InterfaceSchema::Method) { return false; }
-  virtual bool pre_visit_method_implicit_params(InterfaceSchema, InterfaceSchema::Method, capnp::List<capnp::schema::Node::Parameter>::Reader) { return false; }
-  virtual bool post_visit_method_implicit_params(InterfaceSchema, InterfaceSchema::Method, capnp::List<capnp::schema::Node::Parameter>::Reader) { return false; }
-  virtual bool pre_visit_methods(InterfaceSchema) { return false; }
-  virtual bool post_visit_methods(InterfaceSchema) { return false; }
+  virtual bool pre_visit_import(Schema, Import::Reader) { return false; }
   virtual bool pre_visit_nested_decls(Schema) { return false; }
-  virtual bool post_visit_nested_decls(Schema) { return false; }
-  virtual bool pre_visit_param_list(InterfaceSchema, kj::String&, StructSchema) { return false; }
-  virtual bool post_visit_param_list(InterfaceSchema, kj::String&, StructSchema) { return false; }
+  virtual bool pre_visit_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
   virtual bool pre_visit_struct_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool post_visit_struct_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool pre_visit_struct_default_value(StructSchema, capnp::StructSchema::Field) { return false; }
-  virtual bool post_visit_struct_default_value(StructSchema, capnp::StructSchema::Field) { return false; }
-  virtual bool pre_visit_struct_field(StructSchema, StructSchema::Field) { return false; }
-  virtual bool post_visit_struct_field(StructSchema, StructSchema::Field) { return false; }
-  virtual bool pre_visit_struct_field_group(StructSchema, StructSchema::Field, schema::Field::Group::Reader, Schema) { return false; }
-  virtual bool post_visit_struct_field_group(StructSchema, StructSchema::Field, schema::Field::Group::Reader, Schema) { return false; }
-  virtual bool pre_visit_struct_field_slot(StructSchema, StructSchema::Field, schema::Field::Slot::Reader) { return false; }
-  virtual bool post_visit_struct_field_slot(StructSchema, StructSchema::Field, schema::Field::Slot::Reader) { return false; }
-  virtual bool pre_visit_struct_fields(StructSchema) { return false; }
-  virtual bool post_visit_struct_fields(StructSchema) { return false; }
+  virtual bool pre_visit_enum_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
+  virtual bool pre_visit_const_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
+  virtual bool pre_visit_annotation_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
+  virtual bool pre_visit_annotation(schema::Annotation::Reader, Schema) { return false; }
+  virtual bool pre_visit_annotations(Schema) { return false; }
   virtual bool pre_visit_type(Schema, schema::Type::Reader) { return false; }
-  virtual bool post_visit_type(Schema, schema::Type::Reader) { return false; }
   virtual bool pre_visit_value(Schema, schema::Type::Reader, schema::Value::Reader) { return false; }
+  virtual bool pre_visit_struct_fields(StructSchema) { return false; }
+  virtual bool pre_visit_struct_default_value(StructSchema, capnp::StructSchema::Field) { return false; }
+  virtual bool pre_visit_struct_field(StructSchema, StructSchema::Field) { return false; }
+  virtual bool pre_visit_struct_field_slot(StructSchema, StructSchema::Field, schema::Field::Slot::Reader) { return false; }
+  virtual bool pre_visit_struct_field_group(StructSchema, StructSchema::Field, schema::Field::Group::Reader, Schema) { return false; }
+  virtual bool pre_visit_interface_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
+  virtual bool pre_visit_param_list(InterfaceSchema, kj::String&, StructSchema) { return false; }
+  virtual bool pre_visit_method(InterfaceSchema, InterfaceSchema::Method) { return false; }
+  virtual bool pre_visit_methods(InterfaceSchema) { return false; }
+  virtual bool pre_visit_method_implicit_params(InterfaceSchema, InterfaceSchema::Method, capnp::List<capnp::schema::Node::Parameter>::Reader) { return false; }
+  virtual bool pre_visit_enumerant(Schema, EnumSchema::Enumerant) { return false; }
+  virtual bool pre_visit_enumerants(Schema, EnumSchema::EnumerantList) { return false; }
+  virtual bool post_visit_file(Schema, schema::CodeGeneratorRequest::RequestedFile::Reader) { return false; }
+  virtual bool post_visit_imports(Schema, List<Import>::Reader) { return false; }
+  virtual bool post_visit_import(Schema, Import::Reader) { return false; }
+  virtual bool post_visit_nested_decls(Schema) { return false; }
+  virtual bool post_visit_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
+  virtual bool post_visit_struct_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
+  virtual bool post_visit_enum_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
+  virtual bool post_visit_const_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
+  virtual bool post_visit_annotation_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
+  virtual bool post_visit_annotation(schema::Annotation::Reader, Schema) { return false; }
+  virtual bool post_visit_annotations(Schema) { return false; }
+  virtual bool post_visit_type(Schema, schema::Type::Reader) { return false; }
   virtual bool post_visit_value(Schema, schema::Type::Reader, schema::Value::Reader) { return false; }
+  virtual bool post_visit_struct_fields(StructSchema) { return false; }
+  virtual bool post_visit_struct_default_value(StructSchema, capnp::StructSchema::Field) { return false; }
+  virtual bool post_visit_struct_field(StructSchema, StructSchema::Field) { return false; }
+  virtual bool post_visit_struct_field_slot(StructSchema, StructSchema::Field, schema::Field::Slot::Reader) { return false; }
+  virtual bool post_visit_struct_field_group(StructSchema, StructSchema::Field, schema::Field::Group::Reader, Schema) { return false; }
+  virtual bool post_visit_interface_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
+  virtual bool post_visit_param_list(InterfaceSchema, kj::String&, StructSchema) { return false; }
+  virtual bool post_visit_method(InterfaceSchema, InterfaceSchema::Method) { return false; }
+  virtual bool post_visit_methods(InterfaceSchema) { return false; }
+  virtual bool post_visit_method_implicit_params(InterfaceSchema, InterfaceSchema::Method, capnp::List<capnp::schema::Node::Parameter>::Reader) { return false; }
+  virtual bool post_visit_enumerant(Schema, EnumSchema::Enumerant) { return false; }
+  virtual bool post_visit_enumerants(Schema, EnumSchema::EnumerantList) { return false; }
   //[[[end]]]
 };
 
@@ -424,7 +395,7 @@ class CapnpcGenericMain {
       schemaLoader.load(node);
     }
 
-    Generator generator(schemaLoader, stdout);
+    Generator generator(schemaLoader);
     for (auto requestedFile: request.getRequestedFiles()) {
       auto schema = schemaLoader.get(requestedFile.getId());
       generator.traverse_file(schema, requestedFile);
