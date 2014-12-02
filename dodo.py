@@ -63,7 +63,7 @@ class Cog(object):
             yield {
                 'actions': [(cls.cog_process, (filename,))],
                 'file_dep': [filename],
-                'basename': 'cog_%s' % filename,
+                'basename': 'cog_%s' % os.path.basename(filename),
             }
 
     @classmethod
@@ -79,41 +79,45 @@ class Cog(object):
                 output.write(val)
 
 
-def compile(cc_file):
-    @listify
-    def recurse_dir(dir):
-        return (str(p) for p in pathlib.Path(dir).glob('**') if p.is_file())
+class Compile(object):
 
+    def recurse_dir(dir):
+        return list(
+            str(p) for p in pathlib.Path(dir).glob('**') if p.is_file())
+
+    capnp_location = '../github_capnproto/c++/'
     clang_flags = '-std=c++11 -fpermissive -Wall'
     rapidjson_flags = '-Irapidjson/include'
-    file_deps = recurse_dir('rapidjson/include')
-    capnp_flags = ' '.join([
-        '-I../github_capnproto/c++/build/include',
-        # Statically link capnp since that's easier than figuring out -L
-        '../github_capnproto/c++/build/lib/libcapnp.a',
-        '../github_capnproto/c++/build/lib/libkj.a'])
-    file_deps.extend(recurse_dir('../github_capnproto/c++/build/include') +
-                     ['../github_capnproto/c++/build/lib/libcapnp.a',
-                      '../github_capnproto/c++/build/lib/libkj.a'])
     deathhandler_flags = ('-g -rdynamic -IDeathHandler '
                           'DeathHandler/death_handler.cc -ldl')
-    file_deps.extend(recurse_dir('DeathHandler'))
+    cc_files = ['json.c++']
+    header_file = 'generic.h'
 
-    compile_json = ('clang++ {} {} {} {} {} -o %(targets)s'
-                    ).format(cc_file, clang_flags, rapidjson_flags,
-                             deathhandler_flags, capnp_flags)
-    file_deps.append(cc_file)
-    file_deps.append('generic.h')
-    base_name = os.path.splitext(cc_file)[0]
-    return {'actions': [compile_json],
-            'targets': [base_name], 'file_dep': file_deps,
-            'task_dep': ['cog_%s' % cc_file, 'cog_generic.h'],
-            'basename': 'compile_%s' % cc_file}
+    @classmethod
+    def create_doit_tasks(cls):
+        capnp_flags = ' '.join([
+            '-I', '%s/build/include' % cls.capnp_location,
+            # Statically link capnp since that's easier than figuring out -L
+            '%s/build/lib/libcapnp.a' % cls.capnp_location,
+            '%s/build/lib/libkj.a' % cls.capnp_location])
+        file_deps = cls.recurse_dir('rapidjson/include')
+        file_deps.extend(
+            cls.recurse_dir('%s/build/include' % cls.capnp_location) +
+            ['%s/build/lib/libcapnp.a' % cls.capnp_location,
+             '%s/build/lib/libkj.a' % cls.capnp_location])
+        file_deps.extend(cls.recurse_dir('DeathHandler'))
+        file_deps.append(cls.header_file)
 
-
-def task_compile_cc():
-    for filename in ['json.c++']:
-        yield compile(filename)
+        for cc_file in cls.cc_files:
+            compile_json = ('clang++ %s %s %s %s %s -o %%(targets)s' % (
+                cc_file, cls.clang_flags, cls.rapidjson_flags,
+                cls.deathhandler_flags, capnp_flags))
+            base_name = os.path.splitext(cc_file)[0]
+            file_deps = file_deps + [cc_file]
+            yield {'actions': [compile_json],
+                   'targets': [base_name], 'file_dep': file_deps,
+                   'task_dep': ['cog_%s' % cc_file, 'cog_generic.h'],
+                   'basename': 'compile_%s' % cc_file}
 
 
 # From:
