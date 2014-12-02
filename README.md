@@ -32,6 +32,9 @@ Traversal starts off like so:
 Look in generic.h for the listing of methods and the parameters they take, as
 well as the traversal tree.
 
+One thing to note is that the nested declarations are always traversed first,
+so they don't conflict with anything stored for the post_visit methods.
+
 
 JSON
 ----

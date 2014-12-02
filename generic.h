@@ -1,4 +1,3 @@
-
 #include <stdio.h>
 #include <unistd.h>
 #include <typeinfo>
@@ -46,9 +45,9 @@ class BaseGenerator {
   virtual bool traverse_file(Schema file, schema::CodeGeneratorRequest::RequestedFile::Reader requestedFile) {
     PRE_VISIT(file, file, requestedFile);
     auto proto = file.getProto();
-    TRAVERSE(annotations, file, proto.getAnnotations());
     TRAVERSE(nested_decls, file);
     TRAVERSE(imports, file, requestedFile.getImports());
+    TRAVERSE(annotations, file, proto.getAnnotations());
     POST_VISIT(file, file, requestedFile);
     return false;
   }
@@ -102,18 +101,18 @@ class BaseGenerator {
 
   virtual bool traverse_struct_decl(Schema schema, schema::Node::NestedNode::Reader decl) {
     PRE_VISIT(struct_decl, schema, decl);
-    TRAVERSE(annotations, schema);
-    TRAVERSE(struct_fields, schema.asStruct());
     TRAVERSE(nested_decls, schema);
+    TRAVERSE(struct_fields, schema.asStruct());
+    TRAVERSE(annotations, schema);
     POST_VISIT(struct_decl, schema, decl);
     return false;
   }
 
   virtual bool traverse_enum_decl(Schema schema, schema::Node::NestedNode::Reader decl) {
     PRE_VISIT(enum_decl, schema, decl);
-    TRAVERSE(annotations, schema);
-    TRAVERSE(enumerants, schema, schema.asEnum().getEnumerants());
     TRAVERSE(nested_decls, schema);
+    TRAVERSE(enumerants, schema, schema.asEnum().getEnumerants());
+    TRAVERSE(annotations, schema);
     POST_VISIT(enum_decl, schema, decl);
     return false;
   }
@@ -121,17 +120,17 @@ class BaseGenerator {
   virtual bool traverse_const_decl(Schema schema, schema::Node::NestedNode::Reader decl) {
     auto proto = schema.getProto();
     PRE_VISIT(const_decl, schema, decl);
-    TRAVERSE(annotations, schema);
     TRAVERSE(type, schema, proto.getConst().getType());
     TRAVERSE(value, schema, proto.getConst().getType(), proto.getConst().getValue());
+    TRAVERSE(annotations, schema);
     POST_VISIT(const_decl, schema, decl);
     return false;
   }
 
   virtual bool traverse_annotation_decl(Schema schema, schema::Node::NestedNode::Reader decl ) {
     PRE_VISIT(annotation_decl, schema, decl);
-    TRAVERSE(annotations, schema);
     TRAVERSE(type, schema, schema.getProto().getAnnotation().getType());
+    TRAVERSE(annotations, schema);
     POST_VISIT(annotation_decl, schema, decl);
     return false;
   }
@@ -222,7 +221,6 @@ class BaseGenerator {
   virtual bool traverse_struct_field(StructSchema schema, StructSchema::Field field) {
     auto proto = field.getProto();
     PRE_VISIT(struct_field, schema, field);
-    TRAVERSE(annotations, schema, proto.getAnnotations());
     switch (proto.which()) {
       case schema::Field::SLOT: {
         auto slot = proto.getSlot();
@@ -246,6 +244,7 @@ class BaseGenerator {
         break;
       }
     }
+    TRAVERSE(annotations, schema, proto.getAnnotations());
     POST_VISIT(struct_field, schema, field);
     return false;
   }
@@ -253,13 +252,13 @@ class BaseGenerator {
   virtual bool traverse_interface_decl(Schema schema, schema::Node::NestedNode::Reader decl) {
     auto interface = schema.asInterface();
     PRE_VISIT(interface_decl, schema, decl);
-    TRAVERSE(annotations, schema);
+    TRAVERSE(nested_decls, schema);
     PRE_VISIT(methods, interface);
     for (auto method : interface.getMethods()) {
       TRAVERSE(method, interface, method);
     }
     POST_VISIT(methods, interface);
-    TRAVERSE(nested_decls, schema);
+    TRAVERSE(annotations, schema);
     POST_VISIT(interface_decl, schema, decl);
     return false;
   }
@@ -268,7 +267,6 @@ class BaseGenerator {
     auto interface = schema.asInterface();
     PRE_VISIT(method, interface, method);
     auto methodProto = method.getProto();
-    TRAVERSE(annotations, schema, methodProto.getAnnotations());
     TRAVERSE(param_list, interface, kj::str("parameters"), method.getParamType());
     TRAVERSE(param_list, interface, kj::str("results"), method.getResultType());
     if (methodProto.hasImplicitParameters()) {
@@ -276,6 +274,7 @@ class BaseGenerator {
       PRE_VISIT(method_implicit_params, interface, method, implicit);
       POST_VISIT(method_implicit_params, interface, method, implicit);
     }
+    TRAVERSE(annotations, schema, methodProto.getAnnotations());
     POST_VISIT(method, interface, method);
     return false;
   }
