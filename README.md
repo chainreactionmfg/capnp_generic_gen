@@ -49,6 +49,8 @@ been malformed, but instead raised exceptions.
 Requirements:
 -------------
 
+* capnproto: https://github.com/kentonv/capnproto
+  * ./configure --prefix=$PWD/build && make -j8 && make install
 * DeathHandler: https://github.com/vmarkovtsev/DeathHandler
 * rapidjson: https://github.com/miloyip/rapidjson
   * For the json reference implementation only.
