@@ -20,7 +20,7 @@ visit_methods = collections.OrderedDict([
     ('annotation', ['schema::Annotation::Reader', 'Schema']),
     ('annotations', ['Schema']),
     ('type', ['Schema', 'schema::Type::Reader']),
-    ('value', ['Schema', 'schema::Type::Reader', 'schema::Value::Reader']),
+    ('dynamic_value', ['Schema', 'Type', 'DynamicValue::Reader']),
     ('struct_fields', ['StructSchema']),
     ('struct_default_value', ['StructSchema', 'capnp::StructSchema::Field']),
     ('struct_field', ['StructSchema', 'StructSchema::Field']),
@@ -85,7 +85,7 @@ class Compile(object):
         return list(
             str(p) for p in pathlib.Path(dir).glob('**') if p.is_file())
 
-    capnp_location = '../github_capnproto/c++/'
+    capnp_location = '../../github_capnproto/c++'
     clang_flags = '-std=c++11 -fpermissive -Wall'
     rapidjson_flags = '-Irapidjson/include'
     deathhandler_flags = ('-g -rdynamic -IDeathHandler '

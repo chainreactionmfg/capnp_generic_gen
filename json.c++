@@ -86,6 +86,24 @@ class CapnpcJson : public BaseGenerator {
         cog.outl('  writer->String("%s");' % type.lower())
         cog.outl('  break;')
       ]]]*/
+      case schema::Node::STRUCT:
+        writer->String("struct");
+        break;
+      case schema::Node::ENUM:
+        writer->String("enum");
+        break;
+      case schema::Node::INTERFACE:
+        writer->String("interface");
+        break;
+      case schema::Node::FILE:
+        writer->String("file");
+        break;
+      case schema::Node::CONST:
+        writer->String("const");
+        break;
+      case schema::Node::ANNOTATION:
+        writer->String("annotation");
+        break;
       //[[[end]]]
       default:
         break;
@@ -150,7 +168,6 @@ class CapnpcJson : public BaseGenerator {
 
   virtual bool pre_visit_annotation_decl(Schema schema, schema::Node::NestedNode::Reader) override {
     auto proto = schema.getProto().getAnnotation();
-    proto.getType();  // suppress warning.
 
     writer->Key("annotation");
     {
@@ -173,6 +190,58 @@ class CapnpcJson : public BaseGenerator {
             cog.outl('writer->Key("%s");' % target.lower())
             cog.outl('writer->Bool(proto.getTargets%s());' % target.title())
         ]]]*/
+        if (proto.getTargetsStruct()) {
+          writer->Key("struct");
+          writer->Bool(true);
+        }
+        if (proto.getTargetsInterface()) {
+          writer->Key("interface");
+          writer->Bool(true);
+        }
+        if (proto.getTargetsGroup()) {
+          writer->Key("group");
+          writer->Bool(true);
+        }
+        if (proto.getTargetsEnum()) {
+          writer->Key("enum");
+          writer->Bool(true);
+        }
+        if (proto.getTargetsFile()) {
+          writer->Key("file");
+          writer->Bool(true);
+        }
+        if (proto.getTargetsField()) {
+          writer->Key("field");
+          writer->Bool(true);
+        }
+        if (proto.getTargetsUnion()) {
+          writer->Key("union");
+          writer->Bool(true);
+        }
+        if (proto.getTargetsGroup()) {
+          writer->Key("group");
+          writer->Bool(true);
+        }
+        if (proto.getTargetsEnumerant()) {
+          writer->Key("enumerant");
+          writer->Bool(true);
+        }
+        if (proto.getTargetsAnnotation()) {
+          writer->Key("annotation");
+          writer->Bool(true);
+        }
+        if (proto.getTargetsConst()) {
+          writer->Key("const");
+          writer->Bool(true);
+        }
+        if (proto.getTargetsParam()) {
+          writer->Key("param");
+          writer->Bool(true);
+        }
+        if (proto.getTargetsMethod()) {
+          writer->Key("method");
+          writer->Bool(true);
+        }
         //[[[end]]]
         writer->EndObject();
       }
@@ -209,6 +278,48 @@ class CapnpcJson : public BaseGenerator {
         cog.outl('  writer->String("%s");' % type.lower())
         cog.outl('  break;')
       ]]]*/
+      case schema::Type::VOID:
+        writer->String("void");
+        break;
+      case schema::Type::BOOL:
+        writer->String("bool");
+        break;
+      case schema::Type::TEXT:
+        writer->String("text");
+        break;
+      case schema::Type::DATA:
+        writer->String("data");
+        break;
+      case schema::Type::FLOAT32:
+        writer->String("float32");
+        break;
+      case schema::Type::FLOAT64:
+        writer->String("float64");
+        break;
+      case schema::Type::INT8:
+        writer->String("int8");
+        break;
+      case schema::Type::INT16:
+        writer->String("int16");
+        break;
+      case schema::Type::INT32:
+        writer->String("int32");
+        break;
+      case schema::Type::INT64:
+        writer->String("int64");
+        break;
+      case schema::Type::UINT8:
+        writer->String("uint8");
+        break;
+      case schema::Type::UINT16:
+        writer->String("uint16");
+        break;
+      case schema::Type::UINT32:
+        writer->String("uint32");
+        break;
+      case schema::Type::UINT64:
+        writer->String("uint64");
+        break;
       //[[[end]]]
       case schema::Type::LIST: {
         writer->StartObject();
@@ -274,17 +385,9 @@ class CapnpcJson : public BaseGenerator {
     return false;
   }
 
-  bool pre_visit_value(Schema schema, schema::Type::Reader type, schema::Value::Reader value) {
+  bool pre_visit_dynamic_value(Schema schema, Type type, DynamicValue::Reader value) {
     writer->Key(value_reason_.cStr());
     value_reason_ = kj::str("ERROR");
-    visit_value_w_type(schema, schemaLoader.getType(type, schema), value);
-    return false;
-  }
-
-  void visit_value_dynamic(Schema schema, Type type, DynamicValue::Reader value) {
-    // Sadly, this almost-exact-copy of visit_value_w_type is needed to deal
-    // with the fact that you can't get a 'concrete' schema::Value out of a
-    // List or its ilk.
     switch (type.which()) {
       /*[[[cog
       sizes32 = [8, 16, 32]
@@ -305,6 +408,39 @@ class CapnpcJson : public BaseGenerator {
         cog.outl('  writer->%s(value.as<%s>());' % (writer.title(), ctype))
         cog.outl('  break;')
       ]]]*/
+      case schema::Type::BOOL:
+        writer->Bool(value.as<bool>());
+        break;
+      case schema::Type::INT64:
+        writer->Int64(value.as<int64_t>());
+        break;
+      case schema::Type::UINT64:
+        writer->Uint64(value.as<uint64_t>());
+        break;
+      case schema::Type::FLOAT32:
+        writer->Double(value.as<float>());
+        break;
+      case schema::Type::FLOAT64:
+        writer->Double(value.as<double>());
+        break;
+      case schema::Type::INT8:
+        writer->Int(value.as<int8_t>());
+        break;
+      case schema::Type::INT16:
+        writer->Int(value.as<int16_t>());
+        break;
+      case schema::Type::INT32:
+        writer->Int(value.as<int32_t>());
+        break;
+      case schema::Type::UINT8:
+        writer->Uint(value.as<uint8_t>());
+        break;
+      case schema::Type::UINT16:
+        writer->Uint(value.as<uint16_t>());
+        break;
+      case schema::Type::UINT32:
+        writer->Uint(value.as<uint32_t>());
+        break;
       //[[[end]]]
       case schema::Type::VOID:
         writer->String("void"); break;
@@ -352,95 +488,12 @@ class CapnpcJson : public BaseGenerator {
         writer->EndObject();
         break;
       }
-      case schema::Type::INTERFACE: {
-        writer->String(
-            "interface? but that's not possible... how do you serialize an "
-            "interface in a capnp file?");
-        break;
-      }
+      case schema::Type::INTERFACE:
       case schema::Type::ANY_POINTER:
-        writer->String(
-            "any pointer? how do you serialize an anypointer in a capnp file");
+        writer->String("Cannot exist in a schema file.");
         break;
     }
-  }
-
-  void visit_value_w_type(Schema schema, Type type, schema::Value::Reader value) {
-    switch (type.which()) {
-      /*[[[cog
-      sizes32 = [8, 16, 32]
-      sizes64 = [64]
-      types = {'bool': 'bool',
-               'int64': 'int64', 'uint64': 'uint64',
-               'float32': 'double', 'float64': 'double'}
-      types.update({'int%d' % size: 'int' for size in sizes32})
-      types.update({'uint%d' % size: 'uint' for size in sizes32})
-      for type, writer in sorted(types.items()):
-        cog.outl('case schema::Type::%s:' % type.upper())
-        cog.outl('  writer->%s(value.get%s());' % (writer.title(), type.title()))
-        cog.outl('  break;')
-      ]]]*/
-      //[[[end]]]
-      case schema::Type::VOID:
-        writer->Null(); break;
-      case schema::Type::TEXT:
-        writer->String(value.getText().cStr()); break;
-      case schema::Type::DATA:
-        writer->StartArray();
-        for (auto data : value.getData()) {
-          writer->String(reinterpret_cast<const char*>(&data), 1);
-        }
-        writer->EndArray();
-        break;
-      case schema::Type::LIST: {
-        writer->StartArray();
-        auto listType = type.asList();
-        auto listValue = value.getList().getAs<DynamicList>(listType);
-        for (auto element : listValue) {
-          visit_value_dynamic(schema, listType.getElementType(), element);
-        }
-        writer->EndArray();
-        break;
-      }
-      case schema::Type::ENUM: {
-        auto enumerants = type.asEnum().getEnumerants();
-        writer->StartObject();
-        writer->Key("value");
-        writer->Uint(value.getEnum());
-        writer->Key("enumerant");
-        for (auto enumerant : enumerants) {
-          if (enumerant.getIndex() == value.getEnum()) {
-            writer->String(enumerant.getProto().getName().cStr());
-          }
-        }
-        writer->EndObject();
-        break;
-      }
-      case schema::Type::STRUCT: {
-        auto structValue = value.getStruct().getAs<DynamicStruct>(type.asStruct());
-        writer->StartObject();
-        for (auto field : type.asStruct().getFields()) {
-          if (structValue.has(field)) {
-            writer->Key(field.getProto().getName().cStr());
-            auto fieldValue = structValue.get(field);
-            visit_value_dynamic(schema, field.getType(), fieldValue);
-          }
-        }
-        writer->EndObject();
-        break;
-      }
-      case schema::Type::INTERFACE: {
-        writer->String(
-            "interface? but that's not possible... how do you serialize an "
-            "interface in a capnp file?");
-        break;
-      }
-      case schema::Type::ANY_POINTER: {
-        writer->String(
-            "any pointer? how do you serialize an anypointer in a capnp file");
-        break;
-      }
-    }
+    return false;
   }
 
   bool pre_visit_struct_fields(StructSchema) {

@@ -166,46 +166,89 @@ class BaseGenerator {
     return false;
   }
 
+  virtual bool traverse_dynamic_value(Schema& schema, Type type, DynamicValue::Reader value) {
+    PRE_VISIT(dynamic_value, schema, type, value);
+    POST_VISIT(dynamic_value, schema, type, value);
+    return false;
+  }
+
   virtual bool traverse_value(Schema& schema, schema::Type::Reader type, schema::Value::Reader value) {
-    PRE_VISIT(value, schema, type, value);
+    return traverse_value(schema, schemaLoader.getType(type, schema), value);
+  }
+
+  virtual bool traverse_value(Schema& schema, Type type, schema::Value::Reader value) {
     switch (value.which()) {
+      /*[[[cog
+      sizes = [8, 16, 32, 64]
+      types = ['void', 'text', 'data', 'float32', 'float64', 'bool'] + [
+          'int%d' % size for size in sizes] + [
+          'uint%d' % size for size in sizes]
+      for type in types:
+        cog.outl('case schema::Value::%s:' % type.upper())
+        cog.outl('  TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(value.get%s()));' % type.title())
+        cog.outl('  break;')
+      ]]]*/
       case schema::Value::VOID:
-      case schema::Value::BOOL:
-      case schema::Value::INT8:
-      case schema::Value::INT16:
-      case schema::Value::INT32:
-      case schema::Value::INT64:
-      case schema::Value::UINT8:
-      case schema::Value::UINT16:
-      case schema::Value::UINT32:
-      case schema::Value::UINT64:
-      case schema::Value::FLOAT32:
-      case schema::Value::FLOAT64:
-      case schema::Value::TEXT:
-      case schema::Value::DATA:
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(value.getVoid()));
         break;
+      case schema::Value::TEXT:
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(value.getText()));
+        break;
+      case schema::Value::DATA:
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(value.getData()));
+        break;
+      case schema::Value::FLOAT32:
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(value.getFloat32()));
+        break;
+      case schema::Value::FLOAT64:
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(value.getFloat64()));
+        break;
+      case schema::Value::BOOL:
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(value.getBool()));
+        break;
+      case schema::Value::INT8:
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(value.getInt8()));
+        break;
+      case schema::Value::INT16:
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(value.getInt16()));
+        break;
+      case schema::Value::INT32:
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(value.getInt32()));
+        break;
+      case schema::Value::INT64:
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(value.getInt64()));
+        break;
+      case schema::Value::UINT8:
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(value.getUint8()));
+        break;
+      case schema::Value::UINT16:
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(value.getUint16()));
+        break;
+      case schema::Value::UINT32:
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(value.getUint32()));
+        break;
+      case schema::Value::UINT64:
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(value.getUint64()));
+        break;
+      //[[[end]]]
       case schema::Value::LIST: {
-        // auto listValue = value.getList().getAs<DynamicList>(
-        //     ListSchema::of(type.getList().getElementType(), schema));
+        auto listValue = value.getList().getAs<DynamicList>(type.asList());
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(listValue));
         break;
       }
       case schema::Value::ENUM: {
-        // auto enumNode = schemaLoader.get(type.getEnum().getTypeId()).asEnum().getProto();
-        // auto enumerants = enumNode.getEnum().getEnumerants();
+        auto dynamicEnum = DynamicEnum(type.asEnum(), value.getEnum());
+        TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(dynamicEnum));
         break;
       }
       case schema::Value::STRUCT: {
-        // auto structValue = value.getStruct().getAs<DynamicStruct>(
-        //     schemaLoader.get(type.getStruct().getTypeId()).asStruct());
+        TRAVERSE(dynamic_value, schema, type, value.getStruct().getAs<DynamicStruct>(type.asStruct()));
         break;
       }
-      case schema::Value::INTERFACE: {
-        break;
-      }
+      case schema::Value::INTERFACE:
       case schema::Value::ANY_POINTER:
         break;
     }
-    POST_VISIT(value, schema, type, value);
     return false;
   }
 
@@ -318,7 +361,7 @@ class BaseGenerator {
   virtual bool pre_visit_annotation(schema::Annotation::Reader, Schema) { return false; }
   virtual bool pre_visit_annotations(Schema) { return false; }
   virtual bool pre_visit_type(Schema, schema::Type::Reader) { return false; }
-  virtual bool pre_visit_value(Schema, schema::Type::Reader, schema::Value::Reader) { return false; }
+  virtual bool pre_visit_dynamic_value(Schema, Type, DynamicValue::Reader) { return false; }
   virtual bool pre_visit_struct_fields(StructSchema) { return false; }
   virtual bool pre_visit_struct_default_value(StructSchema, capnp::StructSchema::Field) { return false; }
   virtual bool pre_visit_struct_field(StructSchema, StructSchema::Field) { return false; }
@@ -343,7 +386,7 @@ class BaseGenerator {
   virtual bool post_visit_annotation(schema::Annotation::Reader, Schema) { return false; }
   virtual bool post_visit_annotations(Schema) { return false; }
   virtual bool post_visit_type(Schema, schema::Type::Reader) { return false; }
-  virtual bool post_visit_value(Schema, schema::Type::Reader, schema::Value::Reader) { return false; }
+  virtual bool post_visit_dynamic_value(Schema, Type, DynamicValue::Reader) { return false; }
   virtual bool post_visit_struct_fields(StructSchema) { return false; }
   virtual bool post_visit_struct_default_value(StructSchema, capnp::StructSchema::Field) { return false; }
   virtual bool post_visit_struct_field(StructSchema, StructSchema::Field) { return false; }
