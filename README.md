@@ -54,3 +54,5 @@ Requirements:
 * DeathHandler: https://github.com/vmarkovtsev/DeathHandler
 * rapidjson: https://github.com/miloyip/rapidjson
   * For the json reference implementation only.
+* For using doit and/or cog:
+  * pip install -r requirements.txt
