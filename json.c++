@@ -329,10 +329,10 @@ class CapnpcJson : public BaseGenerator {
           type_reason_ = "elementType";
           auto _ = Finally([&](){type_reason_ = default_type_reason_;});
 
-          pre_visit_type(schema, type.getList().getElementType());
+          TRAVERSE(type, schema, type.getList().getElementType());
         }
         writer->EndObject();
-        break;
+        return true;
       }
       case schema::Type::ENUM: {
         auto enumSchema = schemaLoader.get(
@@ -455,12 +455,10 @@ class CapnpcJson : public BaseGenerator {
         break;
       case schema::Type::LIST: {
         writer->StartArray();
-        auto listType = type.asList();
-        auto listValue = value.as<DynamicList>();
-        for (auto element : listValue) {
-          visit_value_dynamic(schema, listType.getElementType(), element);
-        }
-        writer->EndArray();
+        break;
+      }
+      case schema::Type::STRUCT: {
+        writer->StartObject();
         break;
       }
       case schema::Type::ENUM: {
@@ -475,23 +473,25 @@ class CapnpcJson : public BaseGenerator {
         writer->EndObject();
         break;
       }
-      case schema::Type::STRUCT: {
-        auto structValue = value.as<DynamicStruct>();
-        writer->StartObject();
-        for (auto field : type.asStruct().getFields()) {
-          if (structValue.has(field)) {
-            writer->Key(field.getProto().getName().cStr());
-            auto fieldValue = structValue.get(field);
-            visit_value_dynamic(schema, field.getType(), fieldValue);
-          }
-        }
-        writer->EndObject();
-        break;
-      }
       case schema::Type::INTERFACE:
       case schema::Type::ANY_POINTER:
         writer->String("Cannot exist in a schema file.");
         break;
+    }
+    return false;
+  }
+
+  bool post_visit_dynamic_value(Schema schema, Type type, DynamicValue::Reader value) {
+    switch (type.which()) {
+      case schema::Type::LIST: {
+        writer->EndArray();
+        break;
+      }
+      case schema::Type::STRUCT: {
+        writer->EndObject();
+        break;
+      }
+      default: break;
     }
     return false;
   }

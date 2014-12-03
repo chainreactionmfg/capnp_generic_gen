@@ -162,17 +162,40 @@ class BaseGenerator {
 
   virtual bool traverse_type(Schema& schema, schema::Type::Reader type) {
     PRE_VISIT(type, schema, type);
+    if (type.which() == schema::Type::LIST) {
+      TRAVERSE(type, schema, type.getList().getElementType());
+    }
     POST_VISIT(type, schema, type);
     return false;
   }
 
   virtual bool traverse_dynamic_value(Schema& schema, Type type, DynamicValue::Reader value) {
     PRE_VISIT(dynamic_value, schema, type, value);
+    switch (type.which()) {
+      case schema::Type::LIST: {
+        auto listType = type.asList();
+        for (auto element : value.as<DynamicList>()) {
+          TRAVERSE(dynamic_value, schema, listType.getElementType(), element);
+        }
+        break;
+      }
+      case schema::Type::STRUCT: {
+        auto structValue = value.as<DynamicStruct>();
+        for (auto field : type.asStruct().getFields()) {
+          if (structValue.has(field)) {
+            auto fieldValue = structValue.get(field);
+            TRAVERSE(dynamic_value, schema, field.getType(), fieldValue);
+          }
+        }
+        break;
+      }
+      default: break;
+    }
     POST_VISIT(dynamic_value, schema, type, value);
     return false;
   }
 
-  virtual bool traverse_value(Schema& schema, schema::Type::Reader type, schema::Value::Reader value) {
+  inline bool traverse_value(Schema& schema, schema::Type::Reader type, schema::Value::Reader value) {
     return traverse_value(schema, schemaLoader.getType(type, schema), value);
   }
 
@@ -247,6 +270,7 @@ class BaseGenerator {
       }
       case schema::Value::INTERFACE:
       case schema::Value::ANY_POINTER:
+        // These cannot be serialized in a schema file.
         break;
     }
     return false;
