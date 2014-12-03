@@ -1,0 +1,9 @@
+[submodule "capnproto"]
+	path = capnproto
+	url = https://github.com/kentonv/capnproto.git
+[submodule "DeathHandler"]
+	path = DeathHandler
+  url = https://github.com/vmarkovtsev/DeathHandler
+[submodule "rapidjson"]
+	path = rapidjson
+  url = https://github.com/miloyip/rapidjson
