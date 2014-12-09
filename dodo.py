@@ -86,7 +86,7 @@ class Compile(object):
             str(p) for p in pathlib.Path(dir).glob('**') if p.is_file())
 
     capnp_location = '../../github_capnproto/c++'
-    clang_flags = '-std=c++11 -fpermissive -Wall'
+    clang_flags = '-std=c++14 -fpermissive -Wall'
     rapidjson_flags = '-Irapidjson/include'
     deathhandler_flags = ('-g -rdynamic -IDeathHandler '
                           'DeathHandler/death_handler.cc -ldl')
@@ -116,7 +116,8 @@ class Compile(object):
             file_deps = file_deps + [cc_file]
             yield {'actions': [compile_json],
                    'targets': [base_name], 'file_dep': file_deps,
-                   'task_dep': ['cog_%s' % cc_file, 'cog_generic.h'],
+                   'task_dep': ['cog_%s' % cc_file,
+                                'cog_%s' % os.path.basename(cls.header_file)],
                    'basename': 'compile_%s' % cc_file}
 
 
