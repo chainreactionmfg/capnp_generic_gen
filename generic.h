@@ -44,9 +44,9 @@ class BaseGenerator {
 
   virtual bool traverse_file(Schema file, schema::CodeGeneratorRequest::RequestedFile::Reader requestedFile) {
     PRE_VISIT(file, file, requestedFile);
+    TRAVERSE(imports, file, requestedFile.getImports());
     auto proto = file.getProto();
     TRAVERSE(nested_decls, file);
-    TRAVERSE(imports, file, requestedFile.getImports());
     TRAVERSE(annotations, file, proto.getAnnotations());
     POST_VISIT(file, file, requestedFile);
     return false;
@@ -294,7 +294,6 @@ class BaseGenerator {
         PRE_VISIT(struct_field_slot, schema, field, slot);
         TRAVERSE(type, schema, slot.getType());
         if (slot.getHadExplicitDefault()) {
-          printf("-/-/\n");
           PRE_VISIT(struct_default_value, schema, field);
           TRAVERSE(value, schema, slot.getType(), slot.getDefaultValue());
           POST_VISIT(struct_default_value, schema, field);
