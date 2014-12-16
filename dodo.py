@@ -88,7 +88,7 @@ class Compile(object):
     capnp_location = '../../github_capnproto/c++'
     clang_flags = '-std=c++14 -fpermissive -Wall'
     rapidjson_flags = '-Irapidjson/include'
-    deathhandler_flags = ('-g -rdynamic -IDeathHandler '
+    deathhandler_flags = ('-g -rdynamic -IDeathHandler -DUSE_DEATH_HANDLER=1'
                           'DeathHandler/death_handler.cc -ldl')
     cc_files = ['json.c++']
     header_file = 'generic.h'

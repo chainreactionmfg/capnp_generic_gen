@@ -432,7 +432,9 @@ class BaseGenerator {
 #endif
 
 #include <signal.h>
+#if USE_DEATH_HANDLER
 #include "death_handler.h"
+#endif
 
 template <class Generator>
 class CapnpcGenericMain {
@@ -450,7 +452,9 @@ class CapnpcGenericMain {
   SchemaLoader schemaLoader;
 
   kj::MainBuilder::Validity run() {
+#if USE_DEATH_HANDLER
     Debug::DeathHandler dh;
+#endif
     ReaderOptions options;
     options.traversalLimitInWords = Generator::TRAVERSAL_LIMIT;
     StreamFdMessageReader reader(STDIN_FILENO, options);
