@@ -85,10 +85,10 @@ class Compile(object):
         return list(
             str(p) for p in pathlib.Path(dir).glob('**') if p.is_file())
 
-    capnp_location = '../../github_capnproto/c++'
+    capnp_location = '../../github_capnproto/c++/build'
     clang_flags = '-std=c++14 -fpermissive -Wall'
     rapidjson_flags = '-Irapidjson/include'
-    deathhandler_flags = ('-g -rdynamic -IDeathHandler -DUSE_DEATH_HANDLER=1'
+    deathhandler_flags = ('-g -rdynamic -IDeathHandler -DUSE_DEATH_HANDLER=1 '
                           'DeathHandler/death_handler.cc -ldl')
     cc_files = ['json.c++']
     header_file = 'generic.h'
@@ -96,15 +96,15 @@ class Compile(object):
     @classmethod
     def create_doit_tasks(cls):
         capnp_flags = ' '.join([
-            '-I', '%s/build/include' % cls.capnp_location,
+            '-I', '%s/include' % cls.capnp_location,
             # Statically link capnp since that's easier than figuring out -L
-            '%s/build/lib/libcapnp.a' % cls.capnp_location,
-            '%s/build/lib/libkj.a' % cls.capnp_location])
+            '%s/lib/libcapnp.a' % cls.capnp_location,
+            '%s/lib/libkj.a' % cls.capnp_location])
         file_deps = cls.recurse_dir('rapidjson/include')
         file_deps.extend(
-            cls.recurse_dir('%s/build/include' % cls.capnp_location) +
-            ['%s/build/lib/libcapnp.a' % cls.capnp_location,
-             '%s/build/lib/libkj.a' % cls.capnp_location])
+            cls.recurse_dir('%s/include' % cls.capnp_location) +
+            ['%s/lib/libcapnp.a' % cls.capnp_location,
+             '%s/lib/libkj.a' % cls.capnp_location])
         file_deps.extend(cls.recurse_dir('DeathHandler'))
         file_deps.append(cls.header_file)
 
