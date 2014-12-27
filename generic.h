@@ -73,7 +73,7 @@ class BaseGenerator {
     if (nodes.size() == 0) return false;
     PRE_VISIT(nested_decls, schema);
     for (auto decl : nodes) {
-      auto schema = schemaLoader.get(decl.getId());
+      auto schema = schemaLoader.getUnbound(decl.getId());
       auto proto = schema.getProto();
       PRE_VISIT(decl, schema, decl);
       switch (proto.which()) {
@@ -307,7 +307,7 @@ class BaseGenerator {
       }
       case schema::Field::GROUP: {
         auto group = proto.getGroup();
-        auto groupSchema = schemaLoader.get(group.getTypeId());
+        auto groupSchema = schemaLoader.getUnbound(group.getTypeId());
         PRE_VISIT(struct_field_group, schema, field, group, groupSchema);
         TRAVERSE(struct_fields, groupSchema.asStruct());
         POST_VISIT(struct_field_group, schema, field, group, groupSchema);
@@ -337,12 +337,15 @@ class BaseGenerator {
     auto interface = schema.asInterface();
     PRE_VISIT(method, interface, method);
     auto methodProto = method.getProto();
-    TRAVERSE(param_list, interface, kj::str("parameters"), method.getParamType());
-    TRAVERSE(param_list, interface, kj::str("results"), method.getResultType());
     if (methodProto.hasImplicitParameters()) {
       auto implicit = methodProto.getImplicitParameters();
       PRE_VISIT(method_implicit_params, interface, method, implicit);
+      TRAVERSE(param_list, interface, kj::str("parameters"), schemaLoader.getUnbound(methodProto.getParamStructType()).asStruct());
+      TRAVERSE(param_list, interface, kj::str("results"), schemaLoader.getUnbound(methodProto.getResultStructType()).asStruct());
       POST_VISIT(method_implicit_params, interface, method, implicit);
+    } else {
+      TRAVERSE(param_list, interface, kj::str("parameters"), method.getParamType());
+      TRAVERSE(param_list, interface, kj::str("results"), method.getResultType());
     }
     TRAVERSE(annotations, schema, methodProto.getAnnotations());
     POST_VISIT(method, interface, method);
