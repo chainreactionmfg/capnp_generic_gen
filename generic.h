@@ -42,7 +42,9 @@ class BaseGenerator {
   constexpr static const char *TITLE = "Generator title";
   constexpr static const char *DESCRIPTION = "Generator description";
 
-  virtual bool traverse_file(Schema file, schema::CodeGeneratorRequest::RequestedFile::Reader requestedFile) {
+  typedef schema::CodeGeneratorRequest::RequestedFile::Reader RequestedFile;
+  virtual bool traverse_file(
+      const Schema& file, const RequestedFile& requestedFile) {
     PRE_VISIT(file, file, requestedFile);
     TRAVERSE(imports, file, requestedFile.getImports());
     auto proto = file.getProto();
@@ -55,7 +57,7 @@ class BaseGenerator {
   virtual void finish() {}
 
   typedef schema::CodeGeneratorRequest::RequestedFile::Import Import;
-  virtual bool traverse_imports(Schema schema, List<Import>::Reader imports) {
+  virtual bool traverse_imports(const Schema& schema, const List<Import>::Reader& imports) {
     PRE_VISIT(imports, schema, imports);
     for (auto import : imports) {
       PRE_VISIT(import, schema, import);
@@ -65,7 +67,7 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_nested_decls(Schema schema) {
+  virtual bool traverse_nested_decls(const Schema& schema) {
     auto proto = schema.getProto();
     auto nodes = proto.getNestedNodes();
     if (nodes.size() == 0) return false;
@@ -99,7 +101,8 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_struct_decl(Schema schema, schema::Node::NestedNode::Reader decl) {
+  typedef schema::Node::NestedNode::Reader NestedNode;
+  virtual bool traverse_struct_decl(const Schema& schema, const NestedNode& decl) {
     PRE_VISIT(struct_decl, schema, decl);
     TRAVERSE(nested_decls, schema);
     TRAVERSE(struct_fields, schema.asStruct());
@@ -108,7 +111,7 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_enum_decl(Schema schema, schema::Node::NestedNode::Reader decl) {
+  virtual bool traverse_enum_decl(const Schema& schema, const NestedNode& decl) {
     PRE_VISIT(enum_decl, schema, decl);
     TRAVERSE(nested_decls, schema);
     TRAVERSE(enumerants, schema, schema.asEnum().getEnumerants());
@@ -117,7 +120,7 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_const_decl(Schema schema, schema::Node::NestedNode::Reader decl) {
+  virtual bool traverse_const_decl(const Schema& schema, const NestedNode& decl) {
     auto proto = schema.getProto();
     PRE_VISIT(const_decl, schema, decl);
     TRAVERSE(type, schema, proto.getConst().getType());
@@ -127,7 +130,7 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_annotation_decl(Schema schema, schema::Node::NestedNode::Reader decl ) {
+  virtual bool traverse_annotation_decl(const Schema& schema, const NestedNode& decl ) {
     PRE_VISIT(annotation_decl, schema, decl);
     TRAVERSE(type, schema, schema.getProto().getAnnotation().getType());
     TRAVERSE(annotations, schema);
@@ -135,12 +138,13 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_annotations(Schema schema) {
+  virtual bool traverse_annotations(const Schema& schema) {
     TRAVERSE(annotations, schema, schema.getProto().getAnnotations());
     return false;
   }
 
-  virtual bool traverse_annotations(Schema schema, capnp::List<capnp::schema::Annotation>::Reader annotations) {
+  virtual bool traverse_annotations(
+      const Schema& schema, const List<schema::Annotation>::Reader& annotations) {
     if (annotations.size() == 0) return false;
     PRE_VISIT(annotations, schema);
     for (auto ann : annotations) {
@@ -151,7 +155,7 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_annotation(schema::Annotation::Reader annotation, Schema parent) {
+  virtual bool traverse_annotation(const schema::Annotation::Reader& annotation, const Schema& parent) {
     PRE_VISIT(annotation, annotation, parent);
     auto decl = schemaLoader.get(annotation.getId(), annotation.getBrand(), parent);
     auto annDecl = decl.getProto().getAnnotation();
@@ -160,7 +164,7 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_type(Schema& schema, schema::Type::Reader type) {
+  virtual bool traverse_type(const Schema& schema, const schema::Type::Reader& type) {
     PRE_VISIT(type, schema, type);
     if (type.which() == schema::Type::LIST) {
       TRAVERSE(type, schema, type.getList().getElementType());
@@ -169,7 +173,7 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_dynamic_value(Schema& schema, Type type, DynamicValue::Reader value) {
+  virtual bool traverse_dynamic_value(const Schema& schema, const Type& type, const DynamicValue::Reader& value) {
     PRE_VISIT(dynamic_value, schema, type, value);
     switch (type.which()) {
       case schema::Type::LIST: {
@@ -195,11 +199,11 @@ class BaseGenerator {
     return false;
   }
 
-  inline bool traverse_value(Schema& schema, schema::Type::Reader type, schema::Value::Reader value) {
+  inline bool traverse_value(const Schema& schema, const schema::Type::Reader& type, const schema::Value::Reader& value) {
     return traverse_value(schema, schemaLoader.getType(type, schema), value);
   }
 
-  virtual bool traverse_value(Schema& schema, Type type, schema::Value::Reader value) {
+  virtual bool traverse_value(const Schema& schema, const Type& type, const schema::Value::Reader& value) {
     switch (value.which()) {
       /*[[[cog
       sizes = [8, 16, 32, 64]
@@ -276,7 +280,7 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_struct_fields(StructSchema schema) {
+  virtual bool traverse_struct_fields(const StructSchema& schema) {
     PRE_VISIT(struct_fields, schema);
     for (auto field : schema.getFields()) {
       TRAVERSE(struct_field, schema, field);
@@ -285,7 +289,7 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_struct_field(StructSchema schema, StructSchema::Field field) {
+  virtual bool traverse_struct_field(const StructSchema& schema, const StructSchema::Field& field) {
     auto proto = field.getProto();
     PRE_VISIT(struct_field, schema, field);
     switch (proto.which()) {
@@ -315,7 +319,7 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_interface_decl(Schema schema, schema::Node::NestedNode::Reader decl) {
+  virtual bool traverse_interface_decl(const Schema& schema, const NestedNode& decl) {
     auto interface = schema.asInterface();
     PRE_VISIT(interface_decl, schema, decl);
     TRAVERSE(nested_decls, schema);
@@ -329,7 +333,7 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_method(Schema schema, InterfaceSchema::Method method) {
+  virtual bool traverse_method(const Schema& schema, const InterfaceSchema::Method& method) {
     auto interface = schema.asInterface();
     PRE_VISIT(method, interface, method);
     auto methodProto = method.getProto();
@@ -345,14 +349,14 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_param_list(InterfaceSchema interface, kj::String name, StructSchema schema) {
+  virtual bool traverse_param_list(const InterfaceSchema& interface, const kj::String& name, const StructSchema& schema) {
     PRE_VISIT(param_list, interface, name, schema);
     TRAVERSE(struct_fields, schema);
     POST_VISIT(param_list, interface, name, schema);
     return false;
   }
 
-  virtual bool traverse_enumerants(Schema schema, EnumSchema::EnumerantList enumList) {
+  virtual bool traverse_enumerants(const Schema& schema, const EnumSchema::EnumerantList& enumList) {
     PRE_VISIT(enumerants, schema, enumList);
     for (auto enumerant : enumList) {
       PRE_VISIT(enumerant, schema, enumerant);
@@ -366,62 +370,63 @@ class BaseGenerator {
 
   /*[[[cog
   def output_method(method, args):
-    cog.outl('virtual bool %s(%s) { return false; }' % (method, ', '.join(args)))
+    cog.outl('virtual bool %s(const %s&) { return false; }' % (
+        method, '&, const '.join(args)))
   for method, args in visit_methods.items():
     output_method('pre_visit_%s' % method, args)
   for method, args in visit_methods.items():
     output_method('post_visit_%s' % method, args)
   ]]]*/
-  virtual bool pre_visit_file(Schema, schema::CodeGeneratorRequest::RequestedFile::Reader) { return false; }
-  virtual bool pre_visit_imports(Schema, List<Import>::Reader) { return false; }
-  virtual bool pre_visit_import(Schema, Import::Reader) { return false; }
-  virtual bool pre_visit_nested_decls(Schema) { return false; }
-  virtual bool pre_visit_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool pre_visit_struct_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool pre_visit_enum_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool pre_visit_const_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool pre_visit_annotation_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool pre_visit_annotation(schema::Annotation::Reader, Schema) { return false; }
-  virtual bool pre_visit_annotations(Schema) { return false; }
-  virtual bool pre_visit_type(Schema, schema::Type::Reader) { return false; }
-  virtual bool pre_visit_dynamic_value(Schema, Type, DynamicValue::Reader) { return false; }
-  virtual bool pre_visit_struct_fields(StructSchema) { return false; }
-  virtual bool pre_visit_struct_default_value(StructSchema, capnp::StructSchema::Field) { return false; }
-  virtual bool pre_visit_struct_field(StructSchema, StructSchema::Field) { return false; }
-  virtual bool pre_visit_struct_field_slot(StructSchema, StructSchema::Field, schema::Field::Slot::Reader) { return false; }
-  virtual bool pre_visit_struct_field_group(StructSchema, StructSchema::Field, schema::Field::Group::Reader, Schema) { return false; }
-  virtual bool pre_visit_interface_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool pre_visit_param_list(InterfaceSchema, kj::String&, StructSchema) { return false; }
-  virtual bool pre_visit_method(InterfaceSchema, InterfaceSchema::Method) { return false; }
-  virtual bool pre_visit_methods(InterfaceSchema) { return false; }
-  virtual bool pre_visit_method_implicit_params(InterfaceSchema, InterfaceSchema::Method, capnp::List<capnp::schema::Node::Parameter>::Reader) { return false; }
-  virtual bool pre_visit_enumerant(Schema, EnumSchema::Enumerant) { return false; }
-  virtual bool pre_visit_enumerants(Schema, EnumSchema::EnumerantList) { return false; }
-  virtual bool post_visit_file(Schema, schema::CodeGeneratorRequest::RequestedFile::Reader) { return false; }
-  virtual bool post_visit_imports(Schema, List<Import>::Reader) { return false; }
-  virtual bool post_visit_import(Schema, Import::Reader) { return false; }
-  virtual bool post_visit_nested_decls(Schema) { return false; }
-  virtual bool post_visit_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool post_visit_struct_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool post_visit_enum_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool post_visit_const_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool post_visit_annotation_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool post_visit_annotation(schema::Annotation::Reader, Schema) { return false; }
-  virtual bool post_visit_annotations(Schema) { return false; }
-  virtual bool post_visit_type(Schema, schema::Type::Reader) { return false; }
-  virtual bool post_visit_dynamic_value(Schema, Type, DynamicValue::Reader) { return false; }
-  virtual bool post_visit_struct_fields(StructSchema) { return false; }
-  virtual bool post_visit_struct_default_value(StructSchema, capnp::StructSchema::Field) { return false; }
-  virtual bool post_visit_struct_field(StructSchema, StructSchema::Field) { return false; }
-  virtual bool post_visit_struct_field_slot(StructSchema, StructSchema::Field, schema::Field::Slot::Reader) { return false; }
-  virtual bool post_visit_struct_field_group(StructSchema, StructSchema::Field, schema::Field::Group::Reader, Schema) { return false; }
-  virtual bool post_visit_interface_decl(Schema, schema::Node::NestedNode::Reader) { return false; }
-  virtual bool post_visit_param_list(InterfaceSchema, kj::String&, StructSchema) { return false; }
-  virtual bool post_visit_method(InterfaceSchema, InterfaceSchema::Method) { return false; }
-  virtual bool post_visit_methods(InterfaceSchema) { return false; }
-  virtual bool post_visit_method_implicit_params(InterfaceSchema, InterfaceSchema::Method, capnp::List<capnp::schema::Node::Parameter>::Reader) { return false; }
-  virtual bool post_visit_enumerant(Schema, EnumSchema::Enumerant) { return false; }
-  virtual bool post_visit_enumerants(Schema, EnumSchema::EnumerantList) { return false; }
+  virtual bool pre_visit_file(const Schema&, const schema::CodeGeneratorRequest::RequestedFile::Reader&) { return false; }
+  virtual bool pre_visit_imports(const Schema&, const List<Import>::Reader&) { return false; }
+  virtual bool pre_visit_import(const Schema&, const Import::Reader&) { return false; }
+  virtual bool pre_visit_nested_decls(const Schema&) { return false; }
+  virtual bool pre_visit_decl(const Schema&, const schema::Node::NestedNode::Reader&) { return false; }
+  virtual bool pre_visit_struct_decl(const Schema&, const schema::Node::NestedNode::Reader&) { return false; }
+  virtual bool pre_visit_enum_decl(const Schema&, const schema::Node::NestedNode::Reader&) { return false; }
+  virtual bool pre_visit_const_decl(const Schema&, const schema::Node::NestedNode::Reader&) { return false; }
+  virtual bool pre_visit_annotation_decl(const Schema&, const schema::Node::NestedNode::Reader&) { return false; }
+  virtual bool pre_visit_annotation(const schema::Annotation::Reader&, const Schema&) { return false; }
+  virtual bool pre_visit_annotations(const Schema&) { return false; }
+  virtual bool pre_visit_type(const Schema&, const schema::Type::Reader&) { return false; }
+  virtual bool pre_visit_dynamic_value(const Schema&, const Type&, const DynamicValue::Reader&) { return false; }
+  virtual bool pre_visit_struct_fields(const StructSchema&) { return false; }
+  virtual bool pre_visit_struct_default_value(const StructSchema&, const StructSchema::Field&) { return false; }
+  virtual bool pre_visit_struct_field(const StructSchema&, const StructSchema::Field&) { return false; }
+  virtual bool pre_visit_struct_field_slot(const StructSchema&, const StructSchema::Field&, const schema::Field::Slot::Reader&) { return false; }
+  virtual bool pre_visit_struct_field_group(const StructSchema&, const StructSchema::Field&, const schema::Field::Group::Reader&, const Schema&) { return false; }
+  virtual bool pre_visit_interface_decl(const Schema&, const schema::Node::NestedNode::Reader&) { return false; }
+  virtual bool pre_visit_param_list(const InterfaceSchema&, const kj::String&, const StructSchema&) { return false; }
+  virtual bool pre_visit_method(const InterfaceSchema&, const InterfaceSchema::Method&) { return false; }
+  virtual bool pre_visit_methods(const InterfaceSchema&) { return false; }
+  virtual bool pre_visit_method_implicit_params(const InterfaceSchema&, const InterfaceSchema::Method&, const List<schema::Node::Parameter>::Reader&) { return false; }
+  virtual bool pre_visit_enumerant(const Schema&, const EnumSchema::Enumerant&) { return false; }
+  virtual bool pre_visit_enumerants(const Schema&, const EnumSchema::EnumerantList&) { return false; }
+  virtual bool post_visit_file(const Schema&, const schema::CodeGeneratorRequest::RequestedFile::Reader&) { return false; }
+  virtual bool post_visit_imports(const Schema&, const List<Import>::Reader&) { return false; }
+  virtual bool post_visit_import(const Schema&, const Import::Reader&) { return false; }
+  virtual bool post_visit_nested_decls(const Schema&) { return false; }
+  virtual bool post_visit_decl(const Schema&, const schema::Node::NestedNode::Reader&) { return false; }
+  virtual bool post_visit_struct_decl(const Schema&, const schema::Node::NestedNode::Reader&) { return false; }
+  virtual bool post_visit_enum_decl(const Schema&, const schema::Node::NestedNode::Reader&) { return false; }
+  virtual bool post_visit_const_decl(const Schema&, const schema::Node::NestedNode::Reader&) { return false; }
+  virtual bool post_visit_annotation_decl(const Schema&, const schema::Node::NestedNode::Reader&) { return false; }
+  virtual bool post_visit_annotation(const schema::Annotation::Reader&, const Schema&) { return false; }
+  virtual bool post_visit_annotations(const Schema&) { return false; }
+  virtual bool post_visit_type(const Schema&, const schema::Type::Reader&) { return false; }
+  virtual bool post_visit_dynamic_value(const Schema&, const Type&, const DynamicValue::Reader&) { return false; }
+  virtual bool post_visit_struct_fields(const StructSchema&) { return false; }
+  virtual bool post_visit_struct_default_value(const StructSchema&, const StructSchema::Field&) { return false; }
+  virtual bool post_visit_struct_field(const StructSchema&, const StructSchema::Field&) { return false; }
+  virtual bool post_visit_struct_field_slot(const StructSchema&, const StructSchema::Field&, const schema::Field::Slot::Reader&) { return false; }
+  virtual bool post_visit_struct_field_group(const StructSchema&, const StructSchema::Field&, const schema::Field::Group::Reader&, const Schema&) { return false; }
+  virtual bool post_visit_interface_decl(const Schema&, const schema::Node::NestedNode::Reader&) { return false; }
+  virtual bool post_visit_param_list(const InterfaceSchema&, const kj::String&, const StructSchema&) { return false; }
+  virtual bool post_visit_method(const InterfaceSchema&, const InterfaceSchema::Method&) { return false; }
+  virtual bool post_visit_methods(const InterfaceSchema&) { return false; }
+  virtual bool post_visit_method_implicit_params(const InterfaceSchema&, const InterfaceSchema::Method&, const List<schema::Node::Parameter>::Reader&) { return false; }
+  virtual bool post_visit_enumerant(const Schema&, const EnumSchema::Enumerant&) { return false; }
+  virtual bool post_visit_enumerants(const Schema&, const EnumSchema::EnumerantList&) { return false; }
   //[[[end]]]
 };
 
