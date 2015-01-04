@@ -164,7 +164,8 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_type(const Schema& schema, const schema::Type::Reader& type) {
+  virtual bool traverse_type(
+      const Schema& schema, const schema::Type::Reader& type) {
     PRE_VISIT(type, schema, type);
     if (type.which() == schema::Type::LIST) {
       TRAVERSE(type, schema, type.getList().getElementType());
@@ -280,7 +281,8 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_struct_fields(const StructSchema& schema) {
+  virtual bool traverse_struct_fields(
+      const StructSchema& schema) {
     PRE_VISIT(struct_fields, schema);
     for (auto field : schema.getFields()) {
       TRAVERSE(struct_field, schema, field);
@@ -289,7 +291,8 @@ class BaseGenerator {
     return false;
   }
 
-  virtual bool traverse_struct_field(const StructSchema& schema, const StructSchema::Field& field) {
+  virtual bool traverse_struct_field(
+      const StructSchema& schema, const StructSchema::Field& field) {
     auto proto = field.getProto();
     PRE_VISIT(struct_field, schema, field);
     switch (proto.which()) {
@@ -340,19 +343,25 @@ class BaseGenerator {
     if (methodProto.hasImplicitParameters()) {
       auto implicit = methodProto.getImplicitParameters();
       PRE_VISIT(method_implicit_params, interface, method, implicit);
-      TRAVERSE(param_list, interface, kj::str("parameters"), schemaLoader.getUnbound(methodProto.getParamStructType()).asStruct());
-      TRAVERSE(param_list, interface, kj::str("results"), schemaLoader.getUnbound(methodProto.getResultStructType()).asStruct());
+      TRAVERSE(param_list, interface, kj::str("parameters"),
+          schemaLoader.getUnbound(methodProto.getParamStructType()).asStruct());
+      TRAVERSE(param_list, interface, kj::str("results"),
+          schemaLoader.getUnbound(methodProto.getResultStructType()).asStruct());
       POST_VISIT(method_implicit_params, interface, method, implicit);
     } else {
-      TRAVERSE(param_list, interface, kj::str("parameters"), method.getParamType());
-      TRAVERSE(param_list, interface, kj::str("results"), method.getResultType());
+      TRAVERSE(param_list, interface, kj::str("parameters"),
+          method.getParamType());
+      TRAVERSE(param_list, interface, kj::str("results"),
+          method.getResultType());
     }
     TRAVERSE(annotations, schema, methodProto.getAnnotations());
     POST_VISIT(method, interface, method);
     return false;
   }
 
-  virtual bool traverse_param_list(const InterfaceSchema& interface, const kj::String& name, const StructSchema& schema) {
+  virtual bool traverse_param_list(
+      const InterfaceSchema& interface,
+      const kj::String& name, const StructSchema& schema) {
     PRE_VISIT(param_list, interface, name, schema);
     TRAVERSE(struct_fields, schema);
     POST_VISIT(param_list, interface, name, schema);
