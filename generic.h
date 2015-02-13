@@ -47,7 +47,7 @@ class BaseGenerator {
       const Schema& file, const RequestedFile& requestedFile) {
     PRE_VISIT(file, file, requestedFile);
     TRAVERSE(imports, file, requestedFile.getImports());
-    auto proto = file.getProto();
+    const auto& proto = file.getProto();
     TRAVERSE(nested_decls, file);
     TRAVERSE(annotations, file, proto.getAnnotations());
     POST_VISIT(file, file, requestedFile);
@@ -59,7 +59,7 @@ class BaseGenerator {
   typedef schema::CodeGeneratorRequest::RequestedFile::Import Import;
   virtual bool traverse_imports(const Schema& schema, const List<Import>::Reader& imports) {
     PRE_VISIT(imports, schema, imports);
-    for (auto import : imports) {
+    for (const auto& import : imports) {
       PRE_VISIT(import, schema, import);
       POST_VISIT(import, schema, import);
     }
@@ -68,13 +68,13 @@ class BaseGenerator {
   }
 
   virtual bool traverse_nested_decls(const Schema& schema) {
-    auto proto = schema.getProto();
-    auto nodes = proto.getNestedNodes();
+    const auto& proto = schema.getProto();
+    const auto& nodes = proto.getNestedNodes();
     if (nodes.size() == 0) return false;
     PRE_VISIT(nested_decls, schema);
-    for (auto decl : nodes) {
-      auto schema = schemaLoader.getUnbound(decl.getId());
-      auto proto = schema.getProto();
+    for (const auto& decl : nodes) {
+      const auto& schema = schemaLoader.getUnbound(decl.getId());
+      const auto& proto = schema.getProto();
       PRE_VISIT(decl, schema, decl);
       switch (proto.which()) {
         case schema::Node::FILE:
@@ -121,7 +121,7 @@ class BaseGenerator {
   }
 
   virtual bool traverse_const_decl(const Schema& schema, const NestedNode& decl) {
-    auto proto = schema.getProto();
+    const auto& proto = schema.getProto();
     PRE_VISIT(const_decl, schema, decl);
     TRAVERSE(type, schema, proto.getConst().getType());
     TRAVERSE(value, schema, proto.getConst().getType(), proto.getConst().getValue());
@@ -147,8 +147,8 @@ class BaseGenerator {
       const Schema& schema, const List<schema::Annotation>::Reader& annotations) {
     if (annotations.size() == 0) return false;
     PRE_VISIT(annotations, schema);
-    for (auto ann : annotations) {
-      auto annSchema = schemaLoader.get(ann.getId(), ann.getBrand(), schema);
+    for (const auto& ann : annotations) {
+      const auto& annSchema = schemaLoader.get(ann.getId(), ann.getBrand(), schema);
       TRAVERSE(annotation, ann, annSchema);
     }
     POST_VISIT(annotations, schema);
@@ -157,8 +157,8 @@ class BaseGenerator {
 
   virtual bool traverse_annotation(const schema::Annotation::Reader& annotation, const Schema& parent) {
     PRE_VISIT(annotation, annotation, parent);
-    auto decl = schemaLoader.get(annotation.getId(), annotation.getBrand(), parent);
-    auto annDecl = decl.getProto().getAnnotation();
+    const auto& decl = schemaLoader.get(annotation.getId(), annotation.getBrand(), parent);
+    const auto& annDecl = decl.getProto().getAnnotation();
     TRAVERSE(value, parent, annDecl.getType(), annotation.getValue());
     POST_VISIT(annotation, annotation, parent);
     return false;
@@ -178,17 +178,17 @@ class BaseGenerator {
     PRE_VISIT(dynamic_value, schema, type, value);
     switch (type.which()) {
       case schema::Type::LIST: {
-        auto listType = type.asList();
-        for (auto element : value.as<DynamicList>()) {
+        const auto& listType = type.asList();
+        for (const auto& element : value.as<DynamicList>()) {
           TRAVERSE(dynamic_value, schema, listType.getElementType(), element);
         }
         break;
       }
       case schema::Type::STRUCT: {
-        auto structValue = value.as<DynamicStruct>();
-        for (auto field : type.asStruct().getFields()) {
+        const auto& structValue = value.as<DynamicStruct>();
+        for (const auto& field : type.asStruct().getFields()) {
           if (structValue.has(field)) {
-            auto fieldValue = structValue.get(field);
+            const auto& fieldValue = structValue.get(field);
             TRAVERSE(dynamic_value, schema, field.getType(), fieldValue);
           }
         }
@@ -260,12 +260,12 @@ class BaseGenerator {
         break;
       //[[[end]]]
       case schema::Value::LIST: {
-        auto listValue = value.getList().getAs<DynamicList>(type.asList());
+        const auto& listValue = value.getList().getAs<DynamicList>(type.asList());
         TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(listValue));
         break;
       }
       case schema::Value::ENUM: {
-        auto dynamicEnum = DynamicEnum(type.asEnum(), value.getEnum());
+        const auto& dynamicEnum = DynamicEnum(type.asEnum(), value.getEnum());
         TRAVERSE(dynamic_value, schema, type, DynamicValue::Reader(dynamicEnum));
         break;
       }
@@ -327,7 +327,7 @@ class BaseGenerator {
     PRE_VISIT(interface_decl, schema, decl);
     TRAVERSE(nested_decls, schema);
     PRE_VISIT(methods, interface);
-    for (auto method : interface.getMethods()) {
+    for (const auto& method : interface.getMethods()) {
       TRAVERSE(method, interface, method);
     }
     POST_VISIT(methods, interface);
@@ -337,11 +337,11 @@ class BaseGenerator {
   }
 
   virtual bool traverse_method(const Schema& schema, const InterfaceSchema::Method& method) {
-    auto interface = schema.asInterface();
+    const auto& interface = schema.asInterface();
     PRE_VISIT(method, interface, method);
-    auto methodProto = method.getProto();
+    const auto& methodProto = method.getProto();
     if (methodProto.hasImplicitParameters()) {
-      auto implicit = methodProto.getImplicitParameters();
+      const auto& implicit = methodProto.getImplicitParameters();
       PRE_VISIT(method_implicit_params, interface, method, implicit);
       TRAVERSE(param_list, interface, kj::str("parameters"),
           schemaLoader.getUnbound(methodProto.getParamStructType()).asStruct());
@@ -370,9 +370,9 @@ class BaseGenerator {
 
   virtual bool traverse_enumerants(const Schema& schema, const EnumSchema::EnumerantList& enumList) {
     PRE_VISIT(enumerants, schema, enumList);
-    for (auto enumerant : enumList) {
+    for (const auto& enumerant : enumList) {
       PRE_VISIT(enumerant, schema, enumerant);
-      auto proto = enumerant.getProto();
+      const auto& proto = enumerant.getProto();
       TRAVERSE(annotations, schema, proto.getAnnotations());
       POST_VISIT(enumerant, schema, enumerant);
     }
@@ -474,16 +474,16 @@ class CapnpcGenericMain {
     ReaderOptions options;
     options.traversalLimitInWords = Generator::TRAVERSAL_LIMIT;
     StreamFdMessageReader reader(STDIN_FILENO, options);
-    auto request = reader.getRoot<schema::CodeGeneratorRequest>();
+    const auto& request = reader.getRoot<schema::CodeGeneratorRequest>();
 
     // Load the nodes first, we'll use them later.
-    for (auto node: request.getNodes()) {
+    for (const auto& node: request.getNodes()) {
       schemaLoader.load(node);
     }
 
     Generator generator(schemaLoader);
-    for (auto requestedFile: request.getRequestedFiles()) {
-      auto schema = schemaLoader.get(requestedFile.getId());
+    for (const auto& requestedFile: request.getRequestedFiles()) {
+      const auto& schema = schemaLoader.get(requestedFile.getId());
       generator.traverse_file(schema, requestedFile);
     }
     generator.finish();
