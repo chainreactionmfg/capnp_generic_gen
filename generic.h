@@ -284,7 +284,15 @@ class BaseGenerator {
   virtual bool traverse_struct_fields(
       const StructSchema& schema) {
     PRE_VISIT(struct_fields, schema);
-    for (auto field : schema.getFields()) {
+    const auto& unionFields = schema.getUnionFields();
+    if (unionFields.size() > 0) {
+      PRE_VISIT(struct_field_union, schema);
+      for (const auto& field : unionFields) {
+        TRAVERSE(struct_field, schema, field);
+      }
+      POST_VISIT(struct_field_union, schema);
+    }
+    for (const auto& field : schema.getNonUnionFields()) {
       TRAVERSE(struct_field, schema, field);
     }
     POST_VISIT(struct_fields, schema);
@@ -312,6 +320,7 @@ class BaseGenerator {
         auto group = proto.getGroup();
         auto groupSchema = schemaLoader.getUnbound(group.getTypeId());
         PRE_VISIT(struct_field_group, schema, field, group, groupSchema);
+        TRAVERSE(annotations, groupSchema);
         TRAVERSE(struct_fields, groupSchema.asStruct());
         POST_VISIT(struct_field_group, schema, field, group, groupSchema);
         break;
@@ -407,6 +416,7 @@ class BaseGenerator {
   virtual bool pre_visit_struct_field(const StructSchema&, const StructSchema::Field&) { return false; }
   virtual bool pre_visit_struct_field_slot(const StructSchema&, const StructSchema::Field&, const schema::Field::Slot::Reader&) { return false; }
   virtual bool pre_visit_struct_field_group(const StructSchema&, const StructSchema::Field&, const schema::Field::Group::Reader&, const Schema&) { return false; }
+  virtual bool pre_visit_struct_field_union(const StructSchema&) { return false; }
   virtual bool pre_visit_interface_decl(const Schema&, const schema::Node::NestedNode::Reader&) { return false; }
   virtual bool pre_visit_param_list(const InterfaceSchema&, const kj::String&, const StructSchema&) { return false; }
   virtual bool pre_visit_method(const InterfaceSchema&, const InterfaceSchema::Method&) { return false; }
@@ -432,6 +442,7 @@ class BaseGenerator {
   virtual bool post_visit_struct_field(const StructSchema&, const StructSchema::Field&) { return false; }
   virtual bool post_visit_struct_field_slot(const StructSchema&, const StructSchema::Field&, const schema::Field::Slot::Reader&) { return false; }
   virtual bool post_visit_struct_field_group(const StructSchema&, const StructSchema::Field&, const schema::Field::Group::Reader&, const Schema&) { return false; }
+  virtual bool post_visit_struct_field_union(const StructSchema&) { return false; }
   virtual bool post_visit_interface_decl(const Schema&, const schema::Node::NestedNode::Reader&) { return false; }
   virtual bool post_visit_param_list(const InterfaceSchema&, const kj::String&, const StructSchema&) { return false; }
   virtual bool post_visit_method(const InterfaceSchema&, const InterfaceSchema::Method&) { return false; }

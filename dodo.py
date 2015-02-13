@@ -28,6 +28,7 @@ visit_methods = collections.OrderedDict([
                            'schema::Field::Slot::Reader']),
     ('struct_field_group', ['StructSchema', 'StructSchema::Field',
                             'schema::Field::Group::Reader', 'Schema']),
+    ('struct_field_union', ['StructSchema']),
     ('interface_decl', ['Schema', 'schema::Node::NestedNode::Reader']),
     ('param_list', ['InterfaceSchema', 'kj::String', 'StructSchema']),
     ('method', ['InterfaceSchema', 'InterfaceSchema::Method']),
